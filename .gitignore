@@ -1,3 +1,4 @@
 /target
-*.so
-lib/test_sign
+.env
+dump.xml*
+timestamp

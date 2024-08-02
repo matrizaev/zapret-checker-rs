@@ -523,7 +523,7 @@ pub mod bindings {
 
     #[derive(Debug, Default, YaSerialize, YaDeserialize)]
     pub struct SoapSendRequestResponse {
-        #[yaserde(rename = "SendRequestResponse", default)]
+        #[yaserde(rename = "sendRequestResponse", prefix = "ns1", default)]
         pub body: ports::SendRequestResponse,
         #[yaserde(rename = "Fault", default)]
         pub fault: Option<SoapFault>,
@@ -605,7 +605,7 @@ pub mod bindings {
 
     #[derive(Debug, Default, YaSerialize, YaDeserialize)]
     pub struct SoapGetResultResponse {
-        #[yaserde(rename = "GetResultResponse", default)]
+        #[yaserde(rename = "getResultResponse", default)]
         pub body: ports::GetResultResponse,
         #[yaserde(rename = "Fault", default)]
         pub fault: Option<SoapFault>,
