@@ -1,9 +1,10 @@
 mod vigruzki;
 
 use base64::prelude::*;
+use clap::{arg, command, value_parser};
 use core::panic;
-use dotenvy::dotenv;
 use log::info;
+use std::path::PathBuf;
 use std::{env, fs};
 use tokio;
 use tokio::time::{sleep, Duration};
@@ -11,33 +12,76 @@ use vigruzki::{messages, ports::OperatorRequestPortType, services::OperatorReque
 
 const SLEEP_DURATION: Duration = Duration::from_secs(60);
 const MAX_RETRIES: i32 = 5;
+const DEFAULT_REQUEST_FILE_NAME: &str = "request.xml";
+const DEFAULT_SIGNATURE_FILE_NAME: &str = "request.xml.sig";
 const DEFAULT_DUMP_FILE_NAME: &str = "dump.xml.zip";
 const DEFAULT_TIMESTAMP_FILE_NAME: &str = "timestamp";
 
 #[tokio::main]
 async fn main() {
     env_logger::init();
-    dotenv().ok();
 
-    let dump_file_name = env::args()
-        .skip(1)
-        .next()
-        .unwrap_or(DEFAULT_DUMP_FILE_NAME.to_string());
-    let dump_file_name = dump_file_name.trim();
+    let matches = command!() // requires `cargo` feature
+        .arg(
+            arg!(
+                -r --request <FILE> "Sets a custom request file. Default is request.xml"
+            )
+            .required(false)
+            .value_parser(value_parser!(PathBuf)),
+        )
+        .arg(
+            arg!(
+                -s --signature <FILE> "Sets a custom signature file. Default is request.xml.sig"
+            )
+            .required(false)
+            .value_parser(value_parser!(PathBuf)),
+        )
+        .arg(
+            arg!(
+                -t --timestamp <FILE> "Sets a custom timestamp file. Default is timestamp"
+            )
+            .required(false)
+            .value_parser(value_parser!(PathBuf)),
+        )
+        .arg(
+            arg!(
+                -d --dump <FILE> "Sets a custom dump file. Default is dump.xml.zip"
+            )
+            .required(false)
+            .value_parser(value_parser!(PathBuf)),
+        )
+        .get_matches();
 
-    let timestamp_file_name = env::args()
-        .skip(2)
-        .next()
-        .unwrap_or(DEFAULT_TIMESTAMP_FILE_NAME.to_string());
-    let timestamp_file_name = timestamp_file_name.trim();
+    let default_request_file_name = PathBuf::from(DEFAULT_REQUEST_FILE_NAME);
+    let request_file_name = matches
+        .get_one::<PathBuf>("request")
+        .unwrap_or(&default_request_file_name);
+
+    let default_signature_file_name = PathBuf::from(DEFAULT_SIGNATURE_FILE_NAME);
+    let signature_file_name = matches
+        .get_one::<PathBuf>("signature")
+        .unwrap_or(&default_signature_file_name);
+
+    let default_dump_file_name = PathBuf::from(DEFAULT_DUMP_FILE_NAME);
+    let dump_file_name = matches
+        .get_one::<PathBuf>("dump")
+        .unwrap_or(&default_dump_file_name);
+
+    let default_timestamp_file_name = PathBuf::from(DEFAULT_TIMESTAMP_FILE_NAME);
+    let timestamp_file_name = matches
+        .get_one::<PathBuf>("timestamp")
+        .unwrap_or(&default_timestamp_file_name);
 
     let previous_timestamp: i64 = fs::read_to_string(timestamp_file_name)
         .unwrap_or_default()
         .parse()
         .unwrap_or_default();
 
-    let request_file = env::var("REQUEST_FILE").expect("REQUEST_FILE must be set");
-    let request_signature = env::var("REQUEST_SIGNATURE").expect("REQUEST_SIGNATURE must be set");
+    let request_file = fs::read(request_file_name).expect("Unable to read the request file");
+    let signature_file = fs::read(signature_file_name).expect("Unable to read the request file");
+
+    let request_file = BASE64_STANDARD.encode(request_file);
+    let signature_file = BASE64_STANDARD.encode(signature_file);
 
     let client = OperatorRequestService::new_client(None);
 
@@ -68,7 +112,7 @@ async fn main() {
         .send_request(messages::SendRequest {
             parameters: types::SendRequest {
                 request_file: request_file.into(),
-                signature_file: request_signature.into(),
+                signature_file: signature_file.into(),
                 dump_format_version: Some(response.parameters.dump_format_version),
             },
         })
